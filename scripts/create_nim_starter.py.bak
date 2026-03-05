@@ -1,0 +1,367 @@
+#!/usr/bin/env python3
+"""
+Create a minimal iOS project template for NIM SDK integration.
+Usage: python create_nim_starter.py <project_name> [podfile_content]
+"""
+
+import os
+import sys
+import shutil
+
+def get_latest_nimsdk_lite_version():
+    """Get the latest version of NIMSDK_LITE using pod search."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["pod", "search", "--simple", "NIMSDK_LITE"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            # Parse output to find latest version
+            for line in result.stdout.split('\n'):
+                if 'NIMSDK_LITE' in line and 'Latest' in line:
+                    # Extract version number
+                    import re
+                    match = re.search(r'(\d+\.\d+\.\d+)', line)
+                    if match:
+                        return match.group(1)
+    except Exception as e:
+        print(f"⚠️ Could not fetch latest NIMSDK_LITE version: {e}")
+    # Fallback to known latest version
+    return "10.9.75"
+
+
+def create_project_structure(project_name, podfile_content=None):
+    """Create minimal iOS project structure."""
+
+    # Create directories
+    project_dir = os.path.join(os.getcwd(), project_name)
+    xcodeproj_dir = os.path.join(project_dir, f"{project_name}.xcodeproj")
+    source_dir = os.path.join(project_dir, project_name)
+    base_lproj_dir = os.path.join(source_dir, "Base.lproj")
+    assets_dir = os.path.join(source_dir, "Assets.xcassets")
+
+    os.makedirs(xcodeproj_dir, exist_ok=True)
+    os.makedirs(source_dir, exist_ok=True)
+    os.makedirs(base_lproj_dir, exist_ok=True)
+    os.makedirs(assets_dir, exist_ok=True)
+
+    # Create project.pbxproj (minimal Xcode project file)
+    pbxproj_content = generate_pbxproj(project_name)
+    with open(os.path.join(xcodeproj_dir, "project.pbxproj"), "w") as f:
+        f.write(pbxproj_content)
+
+    # Create AppDelegate.swift
+    appdelegate_content = """import UIKit
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // TODO: Initialize NIM SDK UI here
+        // import NEChatKit
+        // NEChatKitClientKit.shared().setup(appKey: "your_app_key")
+        return true
+    }
+
+    // MARK: UISceneSession Lifecycle
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    }
+}
+"""
+    with open(os.path.join(source_dir, "AppDelegate.swift"), "w") as f:
+        f.write(appdelegate_content)
+
+    # Create SceneDelegate.swift
+    scenedelegate_content = """import UIKit
+
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+
+    var window: UIWindow?
+
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        guard let windowScene = (scene as? UIWindowScene) else { return }
+
+        window = UIWindow(windowScene: windowScene)
+        window?.rootViewController = ViewController()
+        window?.makeKeyAndVisible()
+    }
+}
+"""
+    with open(os.path.join(source_dir, "SceneDelegate.swift"), "w") as f:
+        f.write(scenedelegate_content)
+
+    # Create ViewController.swift
+    viewcontroller_content = """import UIKit
+
+class ViewController: UIViewController {
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .white
+
+        // TODO: Add NIM SDK UI integration code here
+        // Example: Present NEChatKit login view or conversation list
+    }
+}
+"""
+    with open(os.path.join(source_dir, "ViewController.swift"), "w") as f:
+        f.write(viewcontroller_content)
+
+    # Create LaunchScreen.storyboard
+    launchscreen_content = """<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21700"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="EHf-IW-A2E">
+            <objects>
+                <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <viewLayoutGuide key="safeArea" whitekey="Bcu-3y-fUS"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="53" y="375"/>
+        </scene>
+    </scenes>
+    <resources>
+        <systemColor name="systemBackgroundColor">
+            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
+    </resources>
+</document>
+"""
+    with open(os.path.join(base_lproj_dir, "LaunchScreen.storyboard"), "w") as f:
+        f.write(launchscreen_content)
+
+    # Create Assets.xcassets with AppIcon
+    assets_content = """{
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "compression-type" : "automatic"
+  }
+}
+"""
+    with open(os.path.join(assets_dir, "Contents.json"), "w") as f:
+        f.write(assets_content)
+
+    # Create AppIcon.appiconset directory
+    appiconset_dir = os.path.join(assets_dir, "AppIcon.appiconset")
+    os.makedirs(appiconset_dir, exist_ok=True)
+
+    # Create AppIcon.appiconset/Contents.json
+    appicon_content = """{
+  "images" : [
+    {
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+"""
+    with open(os.path.join(appiconset_dir, "Contents.json"), "w") as f:
+        f.write(appicon_content)
+
+    # Create Info.plist with SceneDelegate configuration
+    infoplist_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+</dict>
+</plist>
+"""
+    with open(os.path.join(source_dir, "Info.plist"), "w") as f:
+        f.write(infoplist_content)
+
+    # Create Podfile
+    if podfile_content:
+        # Use provided content, replace {ProjectName} with actual name
+        podfile_content = podfile_content.replace("{ProjectName}", project_name)
+    else:
+        # Get latest NIMSDK_LITE version
+        nimsdk_version = get_latest_nimsdk_lite_version()
+
+        # Use default template with NOS_Special subspecs
+        # When specifying NIMSDK_LITE version, use NOS_Special subspecs for all UIKit components
+        # to avoid version conflicts. When not specifying version, use base specs.
+        podfile_content = f"""# NIM SDK iOS Starter Project Podfile
+# Generated by nim-sdk-ios-starter skill
+# Latest NIMSDK_LITE version: {nimsdk_version} (run 'pod search --simple NIMSDK_LITE' to check)
+
+platform :ios, '13.0'
+use_frameworks!
+
+target '{project_name}' do
+  # Option 1: Use NOS_Special subspecs with explicit NIMSDK_LITE version (recommended for custom version)
+  pod 'NEChatKit/NOS_Special', '10.9.0'
+  pod 'NEChatUIKit/NOS_Special', '10.9.0'
+  pod 'NEConversationUIKit/NOS_Special', '10.9.0'
+  pod 'NEContactUIKit/NOS_Special', '10.9.0'
+  pod 'NETeamUIKit/NOS_Special', '10.9.0'
+  pod 'NIMSDK_LITE', '{nimsdk_version}'
+
+  # Option 2: Use base specs without explicit NIMSDK_LITE version (auto-resolved)
+  # Uncomment the lines below and comment the lines above if you don't need to specify NIMSDK_LITE version
+  # pod 'NEChatKit', '10.9.0'
+  # pod 'NEChatUIKit', '10.9.0'
+  # pod 'NEConversationUIKit', '10.9.0'
+  # pod 'NEContactUIKit', '10.9.0'
+  # pod 'NETeamUIKit', '10.9.0'
+  # pod 'NIMSDK_LITE'  # Version will be auto-resolved by CocoaPods
+
+  post_install do |installer|
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      end
+    end
+  end
+end
+"""
+
+    with open(os.path.join(project_dir, "Podfile"), "w") as f:
+        f.write(podfile_content)
+
+    # Create README.md
+    readme_content = f"""# {project_name}
+
+A minimal iOS project template for NIM SDK UI integration.
+
+## Requirements
+
+- iOS 13.0+
+- Xcode 15.0+
+- Swift 5.9+
+- CocoaPods
+
+## Getting Started
+
+1. Open the workspace file in Xcode:
+   ```bash
+   open {project_name}.xcworkspace
+   ```
+
+2. Build and run the project
+
+## Project Structure
+
+```
+{project_name}/
+├── {project_name}.xcodeproj/     # Xcode project
+├── {project_name}.xcworkspace/    # CocoaPods workspace (use this!)
+├── {project_name}/
+│   ├── AppDelegate.swift         # App entry point
+│   ├── SceneDelegate.swift       # Scene management (iOS 13+)
+│   ├── ViewController.swift      # Main view controller
+│   ├── Info.plist                # App configuration with SceneDelegate
+│   └── Assets.xcassets/          # App resources (includes AppIcon)
+├── Pods/                         # CocoaPods dependencies
+└── Podfile                       # Dependency configuration
+"""
+    with open(os.path.join(project_dir, "README.md"), "w") as f:
+        f.write(readme_content)
+
+    return project_dir
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python create_nim_starter.py <project_name> [podfile_content]")
+        sys.exit(1)
+
+    project_name = sys.argv[1]
+    podfile_content = sys.argv[2] if len(sys.argv) > 2 else None
+
+    project_dir = create_project_structure(project_name, podfile_content)
+    print(f"✅ Project created: {project_dir}")
+
+    # Run pod install
+    import subprocess
+    print("📦 Running pod install...")
+    result = subprocess.run(["pod", "install"], cwd=project_dir, capture_output=True, text=True)
+
+    if result.returncode == 0:
+        print("✅ Pod install completed successfully!")
+        print(f"📱 Open the project with: open {project_name}.xcworkspace")
+    else:
+        print("⚠️ Pod install encountered issues:")
+        print(result.stderr)
+        print(f"📦 Try running manually: cd {project_name} && pod install")
+
+
+if __name__ == "__main__":
+    main()

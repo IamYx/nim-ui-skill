@@ -8,10 +8,30 @@ import os
 import sys
 import shutil
 
+def get_latest_nimsdk_lite_version():
+    """Get the latest version of NIMSDK_LITE using pod search."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["pod", "search", "--simple", "NIMSDK_LITE"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if 'NIMSDK_LITE' in line and 'Latest' in line:
+                    import re
+                    match = re.search(r'(\d+\.\d+\.\d+)', line)
+                    if match:
+                        return match.group(1)
+    except Exception as e:
+        print(f"⚠️ Could not fetch latest NIMSDK_LITE version: {e}")
+    return "10.9.75"
+
+
 def create_project_structure(project_name, podfile_content=None):
     """Create minimal iOS project structure."""
 
-    # Create directories
     project_dir = os.path.join(os.getcwd(), project_name)
     xcodeproj_dir = os.path.join(project_dir, f"{project_name}.xcodeproj")
     source_dir = os.path.join(project_dir, project_name)
@@ -23,21 +43,35 @@ def create_project_structure(project_name, podfile_content=None):
     os.makedirs(base_lproj_dir, exist_ok=True)
     os.makedirs(assets_dir, exist_ok=True)
 
-    # Create project.pbxproj (minimal Xcode project file)
     pbxproj_content = generate_pbxproj(project_name)
     with open(os.path.join(xcodeproj_dir, "project.pbxproj"), "w") as f:
         f.write(pbxproj_content)
 
-    # Create AppDelegate.swift
     appdelegate_content = """import UIKit
+import NECoreKit
+import NECoreIM2Kit
+import NEChatKit
+import NEChatUIKit
+import NIMSDK
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // TODO: Initialize NIM SDK UI here
-        // import NEChatKit
-        // NEChatKitClientKit.shared().setup(appKey: "your_app_key")
+        // init
+        // 设置 IM SDK 的配置项，包括 AppKey，推送配置和一些全局配置等
+        let option = NIMSDKOption()
+        option.appKey = "your app key"
+        option.apnsCername = "网易云信控制台配置的 APNS 推送证书名称"
+        option.pkCername = "网易云信控制台配置的 PushKit 推送证书名称"
+
+        // 设置 IM SDK V2 的配置项，包括是否使用旧的登录接口和是否使用云端会话
+        let v2Option = V2NIMSDKOption()
+        v2Option.enableV2CloudConversation = false
+
+        // 初始化 IM UIKit，初始化 Kit 层和 IM SDK，将配置信息透传给 IM SDK。无需再次初始化 IM SDK
+        IMKitClient.instance.setupIM2(option, v2Option)
+
         return true
     }
 
@@ -50,7 +84,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     with open(os.path.join(source_dir, "AppDelegate.swift"), "w") as f:
         f.write(appdelegate_content)
 
-    # Create SceneDelegate.swift
     scenedelegate_content = """import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -69,7 +102,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     with open(os.path.join(source_dir, "SceneDelegate.swift"), "w") as f:
         f.write(scenedelegate_content)
 
-    # Create ViewController.swift
     viewcontroller_content = """import UIKit
 
 class ViewController: UIViewController {
@@ -79,14 +111,12 @@ class ViewController: UIViewController {
         view.backgroundColor = .white
 
         // TODO: Add NIM SDK UI integration code here
-        // Example: Present NEChatKit login view or conversation list
     }
 }
 """
     with open(os.path.join(source_dir, "ViewController.swift"), "w") as f:
         f.write(viewcontroller_content)
 
-    # Create LaunchScreen.storyboard
     launchscreen_content = """<?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
@@ -122,7 +152,6 @@ class ViewController: UIViewController {
     with open(os.path.join(base_lproj_dir, "LaunchScreen.storyboard"), "w") as f:
         f.write(launchscreen_content)
 
-    # Create Assets.xcassets with AppIcon
     assets_content = """{
   "info" : {
     "author" : "xcode",
@@ -136,11 +165,9 @@ class ViewController: UIViewController {
     with open(os.path.join(assets_dir, "Contents.json"), "w") as f:
         f.write(assets_content)
 
-    # Create AppIcon.appiconset directory
     appiconset_dir = os.path.join(assets_dir, "AppIcon.appiconset")
     os.makedirs(appiconset_dir, exist_ok=True)
 
-    # Create AppIcon.appiconset/Contents.json
     appicon_content = """{
   "images" : [
     {
@@ -158,7 +185,6 @@ class ViewController: UIViewController {
     with open(os.path.join(appiconset_dir, "Contents.json"), "w") as f:
         f.write(appicon_content)
 
-    # Create Info.plist with SceneDelegate configuration
     infoplist_content = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -223,25 +249,34 @@ class ViewController: UIViewController {
     with open(os.path.join(source_dir, "Info.plist"), "w") as f:
         f.write(infoplist_content)
 
-    # Create Podfile
     if podfile_content:
-        # Use provided content, replace {ProjectName} with actual name
         podfile_content = podfile_content.replace("{ProjectName}", project_name)
     else:
-        # Use default template
+        nimsdk_version = get_latest_nimsdk_lite_version()
         podfile_content = f"""# NIM SDK iOS Starter Project Podfile
 # Generated by nim-sdk-ios-starter skill
+# Latest NIMSDK_LITE version: {nimsdk_version} (run 'pod search --simple NIMSDK_LITE' to check)
 
 platform :ios, '13.0'
 use_frameworks!
 
 target '{project_name}' do
-  # NIM SDK - 网易云信 IM
-  pod 'NEChatKit', '10.9.0'
-  pod 'NEChatUIKit', '10.9.0'
-  pod 'NEConversationUIKit', '10.9.0'
-  pod 'NEContactUIKit', '10.9.0'
-  pod 'NETeamUIKit', '10.9.0'
+  # Option 1: Use NOS_Special subspecs with explicit NIMSDK_LITE version (recommended for custom version)
+  pod 'NEChatKit/NOS_Special', '10.9.0'
+  pod 'NEChatUIKit/NOS_Special', '10.9.0'
+  pod 'NEConversationUIKit/NOS_Special', '10.9.0'
+  pod 'NEContactUIKit/NOS_Special', '10.9.0'
+  pod 'NETeamUIKit/NOS_Special', '10.9.0'
+  pod 'NIMSDK_LITE', '{nimsdk_version}'
+
+  # Option 2: Use base specs without explicit NIMSDK_LITE version (auto-resolved)
+  # Uncomment the lines below and comment the lines above if you don't need to specify NIMSDK_LITE version
+  # pod 'NEChatKit', '10.9.0'
+  # pod 'NEChatUIKit', '10.9.0'
+  # pod 'NEConversationUIKit', '10.9.0'
+  # pod 'NEContactUIKit', '10.9.0'
+  # pod 'NETeamUIKit', '10.9.0'
+  # pod 'NIMSDK_LITE'  # Version will be auto-resolved by CocoaPods
 
   post_install do |installer|
     installer.pods_project.targets.each do |target|
@@ -256,14 +291,13 @@ end
     with open(os.path.join(project_dir, "Podfile"), "w") as f:
         f.write(podfile_content)
 
-    # Create README.md
     readme_content = f"""# {project_name}
 
-A minimal iOS project template for NIM SDK UI integration (NEChatKit/NEChatUIKit).
+A minimal iOS project template for NIM SDK UI integration.
 
 ## Requirements
 
-- iOS 14.0+
+- iOS 13.0+
 - Xcode 15.0+
 - Swift 5.9+
 - CocoaPods
@@ -275,14 +309,7 @@ A minimal iOS project template for NIM SDK UI integration (NEChatKit/NEChatUIKit
    open {project_name}.xcworkspace
    ```
 
-2. Initialize NIM SDK in `AppDelegate.swift`:
-   ```swift
-   import NIMSDK
-
-   NIMSDKManager.shared().setup(appKey: "your_app_key")
-   ```
-
-3. Replace `your_app_key` with your actual NetEase Cloud信 App Key
+2. Build and run the project
 
 ## Project Structure
 
@@ -294,20 +321,23 @@ A minimal iOS project template for NIM SDK UI integration (NEChatKit/NEChatUIKit
 │   ├── AppDelegate.swift         # App entry point
 │   ├── SceneDelegate.swift       # Scene management (iOS 13+)
 │   ├── ViewController.swift      # Main view controller
-│   └── Assets.xcassets/          # App resources
+│   ├── Info.plist                # App configuration with SceneDelegate
+│   └── Assets.xcassets/          # App resources (includes AppIcon)
 ├── Pods/                         # CocoaPods dependencies
 └── Podfile                       # Dependency configuration
 ```
 
-## Next Steps
+## Simulator Support
 
-- Refer to [NIM SDK UI Documentation](https://dev.yunxin.163.com/docs/product/IM/SDK/ios.html) for integration guide
-- Add your App Key in AppDelegate
-- Implement your IM UI features in ViewController using NEChatKit and NEChatUIKit
+**Important:** On Apple Silicon Macs (M1/M2/M3), this project only supports running on **Rosetta simulators (x86_64)**.
 
-## License
+- **Simulator**: Requires Rosetta (x86_64) on Apple Silicon Macs - native arm64 simulators are not supported
+- **Physical Device**: Fully supported (arm64) - no restrictions
 
-MIT
+To run on simulator:
+1. Select a simulator destination in Xcode
+2. Xcode will automatically use Rosetta for arm64 Macs
+3. Build and run the project
 """
     with open(os.path.join(project_dir, "README.md"), "w") as f:
         f.write(readme_content)
@@ -317,7 +347,6 @@ MIT
 
 def generate_pbxproj(project_name):
     """Generate minimal Xcode project.pbxproj content."""
-    # This is a simplified version - in production, you'd use a proper template
     return f"""// !$*UTF8*$!
 {{
 	archiveVersion = 1;
@@ -548,6 +577,7 @@ def generate_pbxproj(project_name):
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "arm64";
 			}};
 			name = Debug;
 		}};
@@ -714,7 +744,6 @@ def main():
     project_dir = create_project_structure(project_name, podfile_content)
     print(f"✅ Project created: {project_dir}")
 
-    # Run pod install
     import subprocess
     print("📦 Running pod install...")
     result = subprocess.run(["pod", "install"], cwd=project_dir, capture_output=True, text=True)

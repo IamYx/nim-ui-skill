@@ -50,13 +50,30 @@ python3 <skill_directory>/scripts/create_nim_starter.py <project_name>
 ### AppDelegate.swift
 ```swift
 import UIKit
+import NECoreKit
+import NECoreIM2Kit
+import NEChatKit
+import NEChatUIKit
+import NIMSDK
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // TODO: 在这里初始化 NIM SDK
-        // NIMSDKManager.shared().setup(appKey: "your_app_key")
+        // init
+        // 设置 IM SDK 的配置项，包括 AppKey，推送配置和一些全局配置等
+        let option = NIMSDKOption()
+        option.appKey = "your app key"
+        option.apnsCername = "网易云信控制台配置的 APNS 推送证书名称"
+        option.pkCername = "网易云信控制台配置的 PushKit 推送证书名称"
+
+        // 设置 IM SDK V2 的配置项，包括是否使用旧的登录接口和是否使用云端会话
+        let v2Option = V2NIMSDKOption()
+        v2Option.enableV2CloudConversation = false
+
+        // 初始化 IM UIKit，初始化 Kit 层和 IM SDK，将配置信息透传给 IM SDK。无需再次初始化 IM SDK
+        IMKitClient.instance.setupIM2(option, v2Option)
+
         return true
     }
 
@@ -106,7 +123,6 @@ class ViewController: UIViewController {
 执行完成后：
 1. 告知用户项目已创建成功
 2. 提示用户使用 `.xcworkspace` 文件打开项目（不是 `.xcodeproj`）
-3. 提供下一步接入 NIM SDK UI 的简要指引（初始化 NEChatUIKit，配置 App Key 等）
 
 ## 注意事项
 
@@ -114,3 +130,4 @@ class ViewController: UIViewController {
 - 如果 `pod install` 失败，检查网络或尝试 `pod install --repo-update`
 - 提醒用户替换 `your_app_key` 为实际的网易云信 App Key
 - 此模板使用 SceneDelegate 架构，适用于 iOS 13+
+- 在 Apple Silicon Mac 上，模拟器只支持 Rosetta (x86_64)，真机运行不受影响
